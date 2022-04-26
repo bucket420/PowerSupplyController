@@ -1,0 +1,5 @@
+﻿  KepcoOPC.c
+D:\OneDrive\Desktop\PhysicsResearch\kepco_visa_samples\VC\KepcoOPC.c(59,32): warning C4133: 'function': incompatible types - from 'char *' to 'ViPUInt16'
+D:\OneDrive\Desktop\PhysicsResearch\kepco_visa_samples\VC\KepcoOPC.c(58,3): warning C4996: '_sleep': This function or variable has been superceded by newer library or operating system functionality. Consider using Sleep instead. See online help for details.
+D:\OneDrive\Desktop\PhysicsResearch\kepco_visa_samples\VC\KepcoOPC.c(64): warning C4715: 'send_with_wait': not all control paths return a value
+  Kepco_OPC_MSVC.vcxproj -> D:\OneDrive\Desktop\PhysicsResearch\kepco_visa_samples\Win32\Release\KepcoOPC.exe
