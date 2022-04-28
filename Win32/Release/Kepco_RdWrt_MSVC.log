@@ -1,3 +1,0 @@
-﻿C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Microsoft\VC\v160\Microsoft.CppBuild.targets(513,5): warning MSB8028: The intermediate directory (Win32\Release\) contains files shared from another project (KepcoOPC.vcxproj).  This can lead to incorrect clean and rebuild behavior.
-  KepcoRdWrt.c
-D:\OneDrive\Desktop\PhysicsResearch\kepco_visa_samples\VC\KepcoRdWrt.c : fatal error C1041: cannot open program database 'D:\OneDrive\Desktop\PhysicsResearch\kepco_visa_samples\Win32\Release\vc142.pdb'; if multiple CL.EXE write to the same .PDB file, please use /FS

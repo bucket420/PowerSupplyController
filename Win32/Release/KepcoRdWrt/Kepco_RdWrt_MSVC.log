@@ -1,6 +1,0 @@
-﻿  KepcoRdWrt.cpp
-C:\Users\hoadh-23\Desktop\Voltage Control\C++\VC\KepcoRdWrt.cpp(119,19): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
-C:\Users\hoadh-23\Desktop\Voltage Control\C++\VC\KepcoRdWrt.cpp(189,1): warning C4533: initialization of 'start' is skipped by 'goto Close'
-C:\Users\hoadh-23\Desktop\Voltage Control\C++\VC\KepcoRdWrt.cpp(130): message : see declaration of 'start'
-C:\Users\hoadh-23\Desktop\Voltage Control\C++\VC\KepcoRdWrt.cpp(189): message : see declaration of 'Close'
-  Kepco_RdWrt_MSVC.vcxproj -> C:\Users\hoadh-23\Desktop\Voltage Control\C++\Win32\Release\KepcoRdWrt.exe
