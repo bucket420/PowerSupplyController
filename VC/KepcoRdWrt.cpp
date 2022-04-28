@@ -114,7 +114,7 @@ int main(void)
    cin >> current;
    cout << "Frequency: ";
    cin >> freq;
-   voltage = 5;
+   voltage = 20;
 
    int half_cycle = 500 / freq;
    /*size_t invalidChar = current.find_first_not_of("0123456789.", 0);
@@ -157,7 +157,7 @@ int main(void)
 
        if ((std::chrono::steady_clock::now() - start).count() / 1000000 == half_cycle)
        {
-           cout << (std::chrono::steady_clock::now() - start).count() / 1000000 << endl;
+           //cout << (std::chrono::steady_clock::now() - start).count() / 1000000 << endl;
            start = std::chrono::steady_clock::now();
            current *= -1;
            voltage *= -1;
@@ -167,7 +167,7 @@ int main(void)
 
        if (change)
        {
-           input = "curr ";
+           input = "func:mode curr;:curr ";
            input.append(to_string(current).substr(0, 5));
            input.append(";:volt ");
            input.append(to_string(voltage).substr(0, 5));
@@ -181,23 +181,23 @@ int main(void)
            }
            change = false;
 
-           //strcpy(stringinput, "meas:volt ? ; : meas : curr ? \n");
-           //status = viWrite(instr, (ViBuf)stringinput, (ViUInt32)strlen(stringinput), &writeCount);
-           //if (status < VI_SUCCESS)
-           //{
-           //    cout << "Error writing to the device\n";
-           //    goto Close;
-           //}
-           //status = viRead(instr, buffer, 100, &retCount);
-           //if (strchr((char*)buffer, 10)) strchr((char*)buffer, 10)[0] = 0;
-           //if (status < VI_SUCCESS)
-           //{
-           //    cout << "Error reading a response from the device\n";
-           //}
-           //else
-           //{
-           //    //cout << "Volt; Curr: " << retCount << " " << buffer;
-           //}
+           strcpy(stringinput, "func:mode ?;:meas:volt ?;:meas:curr?\n");
+           status = viWrite(instr, (ViBuf)stringinput, (ViUInt32)strlen(stringinput), &writeCount);
+           if (status < VI_SUCCESS)
+           {
+               cout << "Error writing to the device\n";
+               goto Close;
+           }
+           status = viRead(instr, buffer, 100, &retCount);
+           if (strchr((char*)buffer, 10)) strchr((char*)buffer, 10)[0] = 0;
+           if (status < VI_SUCCESS)
+           {
+               cout << "Error reading a response from the device\n";
+           }
+           else
+           {
+               cout << "Volt; Curr: " << retCount << " " << buffer << endl;
+           }
        }
    }
 
