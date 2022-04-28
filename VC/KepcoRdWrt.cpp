@@ -114,7 +114,7 @@ int main(void)
    cin >> current;
    cout << "Frequency: ";
    cin >> freq;
-   voltage = 20;
+   voltage = 5;
 
    int half_cycle = 500 / freq;
    /*size_t invalidChar = current.find_first_not_of("0123456789.", 0);
@@ -157,8 +157,8 @@ int main(void)
 
        if ((std::chrono::steady_clock::now() - start).count() / 1000000 == half_cycle)
        {
+           cout << (std::chrono::steady_clock::now() - start).count() / 1000000 << endl;
            start = std::chrono::steady_clock::now();
-           //cout << (std::chrono::steady_clock::now() - start).count() / 1000000<< " " << half_cycle << endl;
            current *= -1;
            voltage *= -1;
            //cout << to_string(current).substr(0, 4) << endl;
@@ -172,17 +172,32 @@ int main(void)
            input.append(";:volt ");
            input.append(to_string(voltage).substr(0, 5));
            input.append(";:outp on\n");
-           //cout << input << endl;
-           //input.insert(5, to_string(current).substr(0, 4));
            strcpy(stringinput, input.c_str());
            status = viWrite(instr, (ViBuf)stringinput, (ViUInt32)strlen(stringinput), &writeCount);
            if (status < VI_SUCCESS)
            {
-               //cout << "Error writing to the device\n";
+               cout << "Error writing to the device\n";
                goto Close;
            }
-           //cout << "Current set to " << current << ".\n\n";
            change = false;
+
+           //strcpy(stringinput, "meas:volt ? ; : meas : curr ? \n");
+           //status = viWrite(instr, (ViBuf)stringinput, (ViUInt32)strlen(stringinput), &writeCount);
+           //if (status < VI_SUCCESS)
+           //{
+           //    cout << "Error writing to the device\n";
+           //    goto Close;
+           //}
+           //status = viRead(instr, buffer, 100, &retCount);
+           //if (strchr((char*)buffer, 10)) strchr((char*)buffer, 10)[0] = 0;
+           //if (status < VI_SUCCESS)
+           //{
+           //    cout << "Error reading a response from the device\n";
+           //}
+           //else
+           //{
+           //    //cout << "Volt; Curr: " << retCount << " " << buffer;
+           //}
        }
    }
 
