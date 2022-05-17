@@ -94,12 +94,12 @@ int main(void)
         goto Close;
    }
   
-    /*
-     * Set timeout value to 5000 milliseconds (5 seconds).
-     */ 
+   /*
+    * Set timeout value to 5000 milliseconds (5 seconds).
+    */ 
    status = viSetAttribute (instr, VI_ATTR_TMO_VALUE, 5000);
 
-   /* Resetting the device*/
+   /* Resetting the device */
    cout << "Resetting the device\n\n"; 
    strcpy(stringinput, "*rst\n");
    status = viWrite(instr, (ViBuf)stringinput, (ViUInt32)strlen(stringinput), &writeCount);
@@ -110,58 +110,27 @@ int main(void)
    }
 
 
-   cout << "Current (type q to quit): ";
+   cout << "Current: ";
    cin >> current;
    cout << "Frequency: ";
    cin >> freq;
    voltage = 20;
 
+   // 
    int half_cycle = 500 / freq;
-   /*size_t invalidChar = current.find_first_not_of("0123456789.", 0);
-   if (invalidChar != current.npos)
-   {
-       cout << "Invalid current value.\n\n";
-       goto Close;
-   }*/
-
-
 
    bool change = true;
    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
    /* Set Output Current */
    while (true)
    {
-       /*input = "volt ;:outp on\n";
-       cout << "Voltage (type q to quit): ";
-       cin >> voltage;
-
-       if (voltage == "q") break;
-
-       size_t invalidChar = voltage.find_first_not_of("0123456789.", 0);
-       if (invalidChar != voltage.npos)
-       {
-           cout << "Invalid voltage value.\n\n";
-           continue;
-       }
-
-       input.insert(5, voltage);
-       strcpy(stringinput, input.c_str());
-       status = viWrite(instr, (ViBuf)stringinput, (ViUInt32)strlen(stringinput), &writeCount);
-       if (status < VI_SUCCESS)
-       {
-           cout << "Error writing to the device\n";
-           goto Close;
-       }
-       cout << "Voltage set to " << voltage << ".\n\n";*/
-
-
        if ((std::chrono::steady_clock::now() - start).count() / 1000000 == half_cycle)
        {
-           //cout << (std::chrono::steady_clock::now() - start).count() / 1000000 << endl;
+           // cout << (std::chrono::steady_clock::now() - start).count() / 1000000 << endl;
            start = std::chrono::steady_clock::now();
            current *= -1;
            voltage *= -1;
-           //cout << to_string(current).substr(0, 4) << endl;
+           // cout << to_string(current).substr(0, 4) << endl;
            change = true;
        }
 
@@ -179,9 +148,12 @@ int main(void)
                cout << "Error writing to the device\n";
                goto Close;
            }
+           cout << "Current set to " << current << endl;
            change = false;
 
-           strcpy(stringinput, "func:mode ?;:meas:volt ?;:meas:curr?\n");
+           // Measure the output (under development)
+
+           /*strcpy(stringinput, "func:mode ?;:meas:volt ?;:meas:curr?\n");
            status = viWrite(instr, (ViBuf)stringinput, (ViUInt32)strlen(stringinput), &writeCount);
            if (status < VI_SUCCESS)
            {
@@ -197,7 +169,7 @@ int main(void)
            else
            {
                cout << "Volt; Curr: " << retCount << " " << buffer << endl;
-           }
+           }*/
        }
    }
 
