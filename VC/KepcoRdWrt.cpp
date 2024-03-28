@@ -18,7 +18,6 @@
 #if defined(_MSC_VER) && !defined(_CRT_SECURE_NO_DEPRECATE)
 #define _CRT_SECURE_NO_DEPRECATE
 #endif
-#define M_PI 3.14159265358979323846
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -35,6 +34,7 @@
 
 #pragma comment(lib,"XInput.lib")
 #pragma comment(lib,"Xinput9_1_0.lib")
+#define M_PI 3.14159265358979323846
 
 class PowerSupply {
 public:
@@ -97,6 +97,7 @@ public:
         sprintf(stringinput, "list:coun %d;:outp on;:curr:mode list\n", count);
         command();
     }
+};
 
 class MagnetSystem {
 public:
@@ -113,6 +114,7 @@ public:
     float sinLUT[numSteps];
     float xHoppingLUT[numSteps * 2];
     float yHoppingLUT[numSteps * 2];
+    float lastKeyPressed = 0;
 
     MagnetSystem(const char* descriptorX, const char* descriptorY, const char* descriptorZ, 
                 float zCurrent, float xyCurrent, float voltageLimit, int numSteps) {
@@ -171,7 +173,7 @@ public:
 
     void xButtonControl() {
         float time = 0;
-        float angle = 0;
+        float angle;
         while (X == 16384) {  
             angle = 2 * M_PI * this->freq * time;
             PSX.setCurrent(this->xyCurrent * sin(angle), this->voltageLimit);
@@ -198,28 +200,6 @@ public:
 
 
 void loop(float freq, float voltageLimit, float zfield, float xyfield) {
-    //X-button
-    float time = 0; //seconds
-    while (X == 16384) {   
-        current = xyfield * (cos(2 * M_PI * freq * time));
-        PSY.setCurrent(current, voltageLimit);
-        
-        current = xyfield * (sin(2 * M_PI * freq * time));
-        PSX.setCurrent(current, voltageLimit);
-
-        //Determine status of x-button for next iteration of while loop
-        dwResult = XInputGetState(0, &state);
-        X = state.Gamepad.wButtons;
-
-        time += 0.08;
-    }
-
-    //float T = 1.0 / freq;
-    //float TS = T / (2.0 * numSteps);
-
-    while (RightButton == 8) {
-        
-    }
     if (Start == 16) {
         PSX.reset();
         PSY.reset();
