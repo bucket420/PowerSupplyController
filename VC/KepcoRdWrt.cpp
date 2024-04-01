@@ -4,7 +4,7 @@
 /********************************************************************/
 /*              Read and Write to an Instrument Example             */
 /*                                                                  */
-/* This code demonstrates synchronous read and write commands to a  */
+/* This code demonstrates synchronous read and write executeCommands to a  */
 /* GPIB, serial or message-based VXI instrument using VISA.         */
 /*                                                                  */
 /* The general flow of the code is                                  */
@@ -45,7 +45,7 @@ public:
     ViUInt32 retCount;
     ViUInt32 writeCount;
     unsigned char buffer[100];
-    char stringinput[512];
+    char command[512];
 
     PowerSupply() {
         std::cout << "Please provide device descriptor\n";
@@ -65,45 +65,75 @@ public:
         status = viSetAttribute(instr, VI_ATTR_TMO_VALUE, 5000);
     }
 
-    void command() {
-        status = viWrite(instr, (ViBuf)this->stringinput, (ViUInt32)strlen(this->stringinput), &this->writeCount);
+    void executeCommand() {
+        status = viWrite(instr, (ViBuf)this->command, (ViUInt32)strlen(this->command), &this->writeCount);
         if (status < VI_SUCCESS) {
             std::cout << "Error writing to the device\n";
         }
-        memset(stringinput, 0, 512 * sizeof(char));
+        memset(command, 0, 512 * sizeof(char));
     }
 
     void reset() {
         std::cout << "Resetting the device\n\n";
-        strcpy(stringinput, "*rst\n");
-        command();
+        strcpy(command, "*rst\n");
+        executeCommand();
     }
 
     void setCurrent(float current, float voltageLimit) {
-        sprintf(stringinput, "func:mode curr;:curr %f;:volt %f;:outp on\n", current, voltageLimit);
-        command();
+        sprintf(command, "func:mode curr;:curr %f;:volt %f;:outp on\n", current, voltageLimit);
+        executeCommand();
     }
 
     void setCurrentList(float* currentList, int length, float voltageLimit, float dwell, int count) {
-        sprintf(stringinput, "list:cle;:list:dwel %f;:func:mode curr;:volt %f\n", dwell, voltageLimit);
-        std::cout << stringinput;
-        command();
+        sprintf(command, "list:cle;:list:dwel %f;:func:mode curr;:volt %f\n", dwell, voltageLimit);
+        std::cout << command;
+        executeCommand();
         for (int i = 0; i < length; i++) {
             if (i % 8 == 0) {
-                strcpy(stringinput, "list:curr ");
+                strcpy(command, "list:curr ");
             }
-            strcat(stringinput, std::to_string(currentList[i]).substr(0, 5).c_str());
+            strcat(command, std::to_string(currentList[i]).substr(0, 5).c_str());
             if (i % 8 != 7 && i != length - 1) {
-                strcat(stringinput, ",");
+                strcat(command, ",");
             } else {
-                strcat(stringinput, "\n");
-                std::cout << stringinput;
-                command();
+                strcat(command, "\n");
+                std::cout << command;
+                executeCommand();
             }
         }
-        sprintf(stringinput, "list:coun %d;:outp on;:curr:mode list\n", count);
-        std::cout << stringinput;
-        command();
+        sprintf(command, "list:coun %d;:outp on;:curr:mode list\n", count);
+        std::cout << command;
+        // executeCommand();
+    }
+
+    void setHoppingCurrentList(float* LUT, float voltageLimit, float dwell, int count, int start) {
+        sprintf(command, "list:cle;:list:dwel %f;:func:mode curr;:volt %f\n", dwell, voltageLimit);
+        std::cout << command;
+        executeCommand();
+        for (int i = 0; i < NUM_STEPS * 2; i++) {
+            if (i % 8 == 0) {
+                strcpy(command, "list:curr ");
+            }
+            if (i < NUM_STEPS / 2) {
+                strcat(command, std::to_string(LUT[(start + i) % NUM_STEPS]).substr(0, 5).c_str());
+            } else if (i < NUM_STEPS) {
+                strcat(command, std::to_string(LUT[NUM_STEPS / 2]).substr(0, 5).c_str());
+            } else if (i < NUM_STEPS * 3 / 2) {
+                strcat(command, std::to_string(LUT[(start + i - NUM_STEPS / 2) % NUM_STEPS]).substr(0, 5).c_str());
+            } else {
+                strcat(command, std::to_string(LUT[0]).substr(0, 5).c_str());
+            }
+            if (i % 8 != 7 && i != NUM_STEPS * 2 - 1) {
+                strcat(command, ",");
+            } else {
+                strcat(command, "\n");
+                std::cout << command;
+                executeCommand();
+            }
+        }
+        sprintf(command, "list:coun %d;:outp on;:curr:mode list\n", count);
+        std::cout << command;
+        // executeCommand();
     }
 };
 
@@ -210,10 +240,10 @@ public:
 
     void joystickControl() {
         float LX = state.Gamepad.sThumbLX;
-        std::cout << "Left Joystick X-Value " << LX << "\n";
+        // std::cout << "Left Joystick X-Value " << LX << "\n";
         PSX.setCurrent((LX / 32768) * xyCurrent, voltageLimit);
         float LY = state.Gamepad.sThumbLY;
-        std::cout << "Left Joystick Y-Value " << LY << "\n";
+        // std::cout << "Left Joystick Y-Value " << LY << "\n";
         PSY.setCurrent((LY / 32768) * xyCurrent, voltageLimit);
     }
 
@@ -253,10 +283,33 @@ public:
     void dirPadControl() {
         if (state.Gamepad.wButtons > 0 && state.Gamepad.wButtons < 9) {
             lastKeyPressed = state.Gamepad.wButtons;
-            fillHoppingLUTs(lastKeyPressed);
-            PSX.setCurrentList(xHoppingLUT, NUM_STEPS * 2, this->voltageLimit, 1 / freq / NUM_STEPS, 0);
-            PSY.setCurrentList(yHoppingLUT, NUM_STEPS * 2, this->voltageLimit, 1 / freq / NUM_STEPS, 0);
-            PSZ.setCurrentList(zHoppingLUT, 2, this->voltageLimit, 1 / freq / 2, 0);
+            int start;
+            switch (lastKeyPressed) {
+                case 8:
+                    start = 0;
+                    break;
+                case 1:
+                    start = NUM_STEPS / 4;
+                    break;
+                case 4:
+                    start = NUM_STEPS / 2;
+                    break;
+                case 2:
+                    start = NUM_STEPS * 3 / 4;
+                    break;
+                default:
+                    break;
+            }
+            // fillHoppingLUTs(lastKeyPressed);
+            // PSX.setCurrentList(xHoppingLUT, NUM_STEPS * 2, this->voltageLimit, 1 / freq / NUM_STEPS, 0);
+            // PSY.setCurrentList(yHoppingLUT, NUM_STEPS * 2, this->voltageLimit, 1 / freq / NUM_STEPS, 0);
+            // PSZ.setCurrentList(zHoppingLUT, 2, this->voltageLimit, 1 / freq / 2, 0);
+            PSX.setHoppingCurrentList(cosLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, start);
+            PSY.setHoppingCurrentList(sinLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, start);
+            PSZ.setCurrentList(zHoppingLUT, 2, voltageLimit, 1 / freq / 2, 0);
+            PSX.executeCommand();
+            PSY.executeCommand();
+            PSZ.executeCommand();
         }
         while (state.Gamepad.wButtons == lastKeyPressed && state.Gamepad.wButtons != 0) {
             dwResult = XInputGetState(0, &state);
