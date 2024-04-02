@@ -48,19 +48,18 @@ public:
     char command[512];
 
     PowerSupply() {
-        std::cout << "Please provide device descriptor\n";
     }
 
     PowerSupply(const char* descriptor) {
         status = viOpenDefaultRM(&this->defaultRM);
         if (status < VI_SUCCESS) {
-            printf("Could not open a session to the VISA Resource Manager!\n");
+            printf("Could not open a session to the VISA Resource Manager!\n\n");
             exit(EXIT_FAILURE);
         }
-        std::cout << "Connecting to the device\n";
+        std::cout << "Connecting to the device\n\n";
         status = viOpen(this->defaultRM, descriptor, VI_NULL, VI_NULL, &this->instr);
         if (status < VI_SUCCESS) {
-            printf("Cannot open a session to the device.\n");
+            printf("Cannot open a session to the device.\n\n");
         }
         status = viSetAttribute(instr, VI_ATTR_TMO_VALUE, 5000);
     }
@@ -68,7 +67,7 @@ public:
     void executeCommand() {
         status = viWrite(instr, (ViBuf)this->command, (ViUInt32)strlen(this->command), &this->writeCount);
         if (status < VI_SUCCESS) {
-            std::cout << "Error writing to the device\n";
+            std::cout << "Error writing to the device\n\n";
         }
         memset(command, 0, 512 * sizeof(char));
     }
@@ -86,7 +85,7 @@ public:
 
     void setCurrentList(float* currentList, int length, float voltageLimit, float dwell, int count) {
         sprintf(command, "list:cle;:list:dwel %f;:func:mode curr;:volt %f\n", dwell, voltageLimit);
-        std::cout << command;
+        // std::cout << command;
         executeCommand();
         for (int i = 0; i < length; i++) {
             if (i % 8 == 0) {
@@ -97,18 +96,17 @@ public:
                 strcat(command, ",");
             } else {
                 strcat(command, "\n");
-                std::cout << command;
+                // std::cout << command;
                 executeCommand();
             }
         }
         sprintf(command, "list:coun %d;:outp on;:curr:mode list\n", count);
-        std::cout << command;
-        // executeCommand();
+        // std::cout << command;
     }
 
     void setHoppingCurrentList(float* LUT, float voltageLimit, float dwell, int count, int start) {
         sprintf(command, "list:cle;:list:dwel %f;:func:mode curr;:volt %f\n", dwell, voltageLimit);
-        std::cout << command;
+        // std::cout << command;
         executeCommand();
         for (int i = 0; i < NUM_STEPS * 2; i++) {
             if (i % 8 == 0) {
@@ -117,23 +115,22 @@ public:
             if (i < NUM_STEPS / 2) {
                 strcat(command, std::to_string(LUT[(start + i) % NUM_STEPS]).substr(0, 5).c_str());
             } else if (i < NUM_STEPS) {
-                strcat(command, std::to_string(LUT[NUM_STEPS / 2]).substr(0, 5).c_str());
+                strcat(command, std::to_string(LUT[(start + NUM_STEPS / 2) % NUM_STEPS]).substr(0, 5).c_str());
             } else if (i < NUM_STEPS * 3 / 2) {
                 strcat(command, std::to_string(LUT[(start + i - NUM_STEPS / 2) % NUM_STEPS]).substr(0, 5).c_str());
             } else {
-                strcat(command, std::to_string(LUT[0]).substr(0, 5).c_str());
+                strcat(command, std::to_string(LUT[start]).substr(0, 5).c_str());
             }
             if (i % 8 != 7 && i != NUM_STEPS * 2 - 1) {
                 strcat(command, ",");
             } else {
                 strcat(command, "\n");
-                std::cout << command;
+                // std::cout << command;
                 executeCommand();
             }
         }
         sprintf(command, "list:coun %d;:outp on;:curr:mode list\n", count);
-        std::cout << command;
-        // executeCommand();
+        // std::cout << command;
     }
 };
 
@@ -150,10 +147,8 @@ public:
     float freq;
     float cosLUT[NUM_STEPS];
     float sinLUT[NUM_STEPS];
-    float xHoppingLUT[NUM_STEPS * 2];
-    float yHoppingLUT[NUM_STEPS * 2];
     float zHoppingLUT[2];
-    float lastKeyPressed = 0;
+    int lastKeyPressed = 0;
     bool active = true;
 
     MagnetSystem(const char* descriptorX, const char* descriptorY, const char* descriptorZ, 
@@ -180,61 +175,13 @@ public:
         }
     }
 
-    // need reworking
-    void fillHoppingLUTs(int direction) {
-        switch (direction) {
-            case 8: // right
-                for (int i = 0; i < NUM_STEPS / 2; i++) {
-                    xHoppingLUT[i] = cosLUT[i];
-                    yHoppingLUT[i] = -sinLUT[i];
-                }
-                for (int i = NUM_STEPS / 2; i < NUM_STEPS; i++) {
-                    xHoppingLUT[i] = cosLUT[NUM_STEPS / 2];
-                    yHoppingLUT[i] = -sinLUT[NUM_STEPS / 2];
-                }
-                for (int i = NUM_STEPS; i < NUM_STEPS * 3 / 2; i++) {
-                    xHoppingLUT[i] = cosLUT[i - NUM_STEPS / 2];
-                    yHoppingLUT[i] = -sinLUT[i - NUM_STEPS / 2];
-                }
-                for (int i = NUM_STEPS * 3 / 2; i < NUM_STEPS * 2; i++) {
-                    xHoppingLUT[i] = cosLUT[0];
-                    yHoppingLUT[i] = -sinLUT[0];
-                }
-                break;
-            case 1: // up
-                break;
-            case 4: // left
-                for (int i = 0; i < NUM_STEPS / 2; i++) {
-                    xHoppingLUT[i] = -cosLUT[i];
-                    yHoppingLUT[i] = sinLUT[i];
-                }
-                for (int i = NUM_STEPS / 2; i < NUM_STEPS; i++) {
-                    xHoppingLUT[i] = -cosLUT[NUM_STEPS / 2];
-                    yHoppingLUT[i] = sinLUT[NUM_STEPS / 2];
-                }
-                for (int i = NUM_STEPS; i < NUM_STEPS * 3 / 2; i++) {
-                    xHoppingLUT[i] = -cosLUT[i - NUM_STEPS / 2];
-                    yHoppingLUT[i] = sinLUT[i - NUM_STEPS / 2];
-                }
-                for (int i = NUM_STEPS * 3 / 2; i < NUM_STEPS * 2; i++) {
-                    xHoppingLUT[i] = -cosLUT[0];
-                    yHoppingLUT[i] = sinLUT[0];
-                }
-                break;
-            case 2: // down
-                break;
-            default: // none
-                break;
-        }
-    }
-
     void initializeController() {
         ZeroMemory(&state, sizeof(XINPUT_STATE));
         dwResult = XInputGetState(0, &state);
         if (dwResult == ERROR_SUCCESS) {
-            std::cout << "Controller is connected!\n";
+            std::cout << "Controller is connected!\n\n";
         } else {
-            std::cout << "Controller " << 0 << " is not connected!\n";
+            std::cout << "Controller " << 0 << " is not connected!\n\n";
         }
     }
 
@@ -258,16 +205,20 @@ public:
     }
 
     void xButtonControl() {
-        float time = 0;
-        float angle;
-        while (state.Gamepad.wButtons == 16384) {
-            angle = 2 * M_PI * this->freq * time;
-            PSX.setCurrent(xyCurrent * sin(angle), voltageLimit);
-            PSY.setCurrent(xyCurrent * cos(angle), voltageLimit);
-
-            //Determine status of x-button for next iteration of while loop
+        if (state.Gamepad.wButtons == 16384) {
+            lastKeyPressed = state.Gamepad.wButtons;
+            PSX.setCurrentList(cosLUT, NUM_STEPS, voltageLimit, 1 / freq / NUM_STEPS, 0);
+            PSY.setCurrentList(sinLUT, NUM_STEPS, voltageLimit, 1 / freq / NUM_STEPS, 0);
+            PSX.executeCommand();
+            PSY.executeCommand();
+        }
+        while (state.Gamepad.wButtons == lastKeyPressed && state.Gamepad.wButtons != 0) {
             dwResult = XInputGetState(0, &state);
-            time += 0.08;
+        }
+        if (state.Gamepad.wButtons == 0 && lastKeyPressed == 16384) {
+            PSX.reset();
+            PSY.reset();
+            lastKeyPressed = 0;
         }
     }
 
@@ -283,27 +234,21 @@ public:
     void dirPadControl() {
         if (state.Gamepad.wButtons > 0 && state.Gamepad.wButtons < 9) {
             lastKeyPressed = state.Gamepad.wButtons;
-            int start;
+            int start = 0;
             switch (lastKeyPressed) {
-                case 8:
+                case 8: // right
                     start = 0;
                     break;
-                case 1:
+                case 1: // up
                     start = NUM_STEPS / 4;
                     break;
-                case 4:
+                case 4: // left
                     start = NUM_STEPS / 2;
                     break;
-                case 2:
+                case 2: // down
                     start = NUM_STEPS * 3 / 4;
                     break;
-                default:
-                    break;
             }
-            // fillHoppingLUTs(lastKeyPressed);
-            // PSX.setCurrentList(xHoppingLUT, NUM_STEPS * 2, this->voltageLimit, 1 / freq / NUM_STEPS, 0);
-            // PSY.setCurrentList(yHoppingLUT, NUM_STEPS * 2, this->voltageLimit, 1 / freq / NUM_STEPS, 0);
-            // PSZ.setCurrentList(zHoppingLUT, 2, this->voltageLimit, 1 / freq / 2, 0);
             PSX.setHoppingCurrentList(cosLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, start);
             PSY.setHoppingCurrentList(sinLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, start);
             PSZ.setCurrentList(zHoppingLUT, 2, voltageLimit, 1 / freq / 2, 0);
@@ -350,7 +295,6 @@ int main(void) {
     float freq;
 
     /*Initializing the device to zero */
-
     std::cout << "freq: ";
     std::cin >> freq;
 
@@ -364,7 +308,8 @@ int main(void) {
     std::cout << "XY-field Current: ";
     std::cin >> xyCurrent;
 
-    MagnetSystem magnets = MagnetSystem("ASRL3::INSTR", "ASRL4::INSTR", "ASRL5::INSTR", zCurrent, xyCurrent, freq, voltageLimit);
+    MagnetSystem magnets = MagnetSystem("ASRL3::INSTR", "ASRL4::INSTR", "ASRL5::INSTR", 
+                                        zCurrent, xyCurrent, freq, voltageLimit);
     magnets.initializeController();
     magnets.run();
 }        
