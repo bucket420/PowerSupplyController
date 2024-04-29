@@ -85,7 +85,7 @@ public:
 
     void setCurrentList(float* currentList, int length, float voltageLimit, float dwell, int count) {
         sprintf(command, "list:cle;:list:dwel %f;:func:mode curr;:volt %f\n", dwell, voltageLimit);
-        // std::cout << command;
+        std::cout << command;
         executeCommand();
         for (int i = 0; i < length; i++) {
             if (i % 8 == 0) {
@@ -96,41 +96,41 @@ public:
                 strcat(command, ",");
             } else {
                 strcat(command, "\n");
-                // std::cout << command;
+                std::cout << command;
                 executeCommand();
             }
         }
         sprintf(command, "list:coun %d;:outp on;:curr:mode list\n", count);
-        // std::cout << command;
+        std::cout << command;
     }
 
     void setHoppingCurrentList(float* LUT, float voltageLimit, float dwell, int count, int start) {
         sprintf(command, "list:cle;:list:dwel %f;:func:mode curr;:volt %f\n", dwell, voltageLimit);
-        // std::cout << command;
+        std::cout << command;
         executeCommand();
         for (int i = 0; i < NUM_STEPS * 2; i++) {
             if (i % 8 == 0) {
                 strcpy(command, "list:curr ");
             }
             if (i < NUM_STEPS / 2) {
-                strcat(command, std::to_string(LUT[(start + i) % NUM_STEPS]).substr(0, 5).c_str());
-            } else if (i < NUM_STEPS) {
-                strcat(command, std::to_string(LUT[(start + NUM_STEPS / 2) % NUM_STEPS]).substr(0, 5).c_str());
-            } else if (i < NUM_STEPS * 3 / 2) {
-                strcat(command, std::to_string(LUT[(start + i - NUM_STEPS / 2) % NUM_STEPS]).substr(0, 5).c_str());
-            } else {
                 strcat(command, std::to_string(LUT[start]).substr(0, 5).c_str());
+            } else if (i < NUM_STEPS) {
+                strcat(command, std::to_string(LUT[(start + i - NUM_STEPS / 2) % NUM_STEPS]).substr(0, 5).c_str());
+            } else if (i < NUM_STEPS * 3 / 2) {
+                strcat(command, std::to_string(LUT[(start + NUM_STEPS / 2) % NUM_STEPS]).substr(0, 5).c_str());
+            } else {
+                strcat(command, std::to_string(LUT[(start + i - NUM_STEPS) % NUM_STEPS]).substr(0, 5).c_str());
             }
             if (i % 8 != 7 && i != NUM_STEPS * 2 - 1) {
                 strcat(command, ",");
             } else {
                 strcat(command, "\n");
-                // std::cout << command;
+                std::cout << command;
                 executeCommand();
             }
         }
         sprintf(command, "list:coun %d;:outp on;:curr:mode list\n", count);
-        // std::cout << command;
+        std::cout << command;
     }
 };
 
@@ -251,10 +251,25 @@ public:
             }
             PSX.setHoppingCurrentList(cosLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, start);
             PSY.setHoppingCurrentList(sinLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, start);
-            PSZ.setCurrentList(zHoppingLUT, 2, voltageLimit, 1 / freq / 2, 0);
-            PSX.executeCommand();
+            PSZ.setCurrentList(zHoppingLUT, 2, voltageLimit, 1 / freq, 0);
+
+            //auto begin = std::chrono::high_resolution_clock::now();
             PSY.executeCommand();
+            //auto end = std::chrono::high_resolution_clock::now();
+            //std::chrono::duration<double> elapsed_seconds = end - begin;
+            //std::cout << "Elapsed time (y): " << elapsed_seconds.count() << "s" << std::endl;
+
+            //begin = std::chrono::high_resolution_clock::now();
+            PSX.executeCommand();
+            //end = std::chrono::high_resolution_clock::now();
+            //elapsed_seconds = end - begin;
+            //std::cout << "Elapsed time (x): " << elapsed_seconds.count() << "s" << std::endl;
+
+            //begin = std::chrono::high_resolution_clock::now();
             PSZ.executeCommand();
+            //end = std::chrono::high_resolution_clock::now();
+            //elapsed_seconds = end - begin;
+            //std::cout << "Elapsed time (z): " << elapsed_seconds.count() << "s" << std::endl;
         }
         while (state.Gamepad.wButtons == lastKeyPressed && state.Gamepad.wButtons != 0) {
             dwResult = XInputGetState(0, &state);
@@ -267,9 +282,17 @@ public:
         }
     }
 
+    void testXY() {
+        PSX.setHoppingCurrentList(cosLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, 0);
+        PSX.executeCommand();
+        /*PSY.setHoppingCurrentList(sinLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, 0);
+        PSY.executeCommand();*/
+    }
+
     void run() {
         while (active) {
             dwResult = XInputGetState(0, &state);
+            //std::cout << state.Gamepad.wButtons << "\n";
             joystickControl();
             triggerControl();
             xButtonControl();
@@ -289,7 +312,7 @@ public:
 * VISA help under the Section titled Type Assignments Table. The VISA
 * help is located in your NI-VISA directory or folder.
 */
-
+ 
 int main(void) {
     float voltageLimit = 20;
     float freq;
@@ -297,19 +320,23 @@ int main(void) {
     /*Initializing the device to zero */
     std::cout << "freq: ";
     std::cin >> freq;
+    std::cout << "\n";
 
     // Z-FIELD 
     float zCurrent;
-    std::cout << "Z-field Current: ";
+    std::cout << "z-field Current: ";
     std::cin >> zCurrent;
+    std::cout << "\n";
 
     // XY-FIELD 
     float xyCurrent;
-    std::cout << "XY-field Current: ";
-    std::cin >> xyCurrent;
+    std::cout << "xy-field Current: ";
+    std::cin >> xyCurrent;    
+    std::cout << "\n";
 
     MagnetSystem magnets = MagnetSystem("ASRL3::INSTR", "ASRL4::INSTR", "ASRL5::INSTR", 
                                         zCurrent, xyCurrent, freq, voltageLimit);
     magnets.initializeController();
+    //magnets.testXY();
     magnets.run();
 }        
