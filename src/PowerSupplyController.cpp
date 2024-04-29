@@ -94,7 +94,8 @@ public:
             strcat(command, std::to_string(currentList[i]).substr(0, 5).c_str());
             if (i % 8 != 7 && i != length - 1) {
                 strcat(command, ",");
-            } else {
+            }
+            else {
                 strcat(command, "\n");
                 std::cout << command;
                 executeCommand();
@@ -114,16 +115,20 @@ public:
             }
             if (i < NUM_STEPS / 2) {
                 strcat(command, std::to_string(LUT[start]).substr(0, 5).c_str());
-            } else if (i < NUM_STEPS) {
+            }
+            else if (i < NUM_STEPS) {
                 strcat(command, std::to_string(LUT[(start + i - NUM_STEPS / 2) % NUM_STEPS]).substr(0, 5).c_str());
-            } else if (i < NUM_STEPS * 3 / 2) {
+            }
+            else if (i < NUM_STEPS * 3 / 2) {
                 strcat(command, std::to_string(LUT[(start + NUM_STEPS / 2) % NUM_STEPS]).substr(0, 5).c_str());
-            } else {
+            }
+            else {
                 strcat(command, std::to_string(LUT[(start + i - NUM_STEPS) % NUM_STEPS]).substr(0, 5).c_str());
             }
             if (i % 8 != 7 && i != NUM_STEPS * 2 - 1) {
                 strcat(command, ",");
-            } else {
+            }
+            else {
                 strcat(command, "\n");
                 std::cout << command;
                 executeCommand();
@@ -151,8 +156,8 @@ public:
     int lastKeyPressed = 0;
     bool active = true;
 
-    MagnetSystem(const char* descriptorX, const char* descriptorY, const char* descriptorZ, 
-                float zCurrent, float xyCurrent, float freq, float voltageLimit) {
+    MagnetSystem(const char* descriptorX, const char* descriptorY, const char* descriptorZ,
+        float zCurrent, float xyCurrent, float freq, float voltageLimit) {
         PSX = PowerSupply(descriptorX);
         PSY = PowerSupply(descriptorY);
         PSZ = PowerSupply(descriptorZ);
@@ -180,7 +185,8 @@ public:
         dwResult = XInputGetState(0, &state);
         if (dwResult == ERROR_SUCCESS) {
             std::cout << "Controller is connected!\n\n";
-        } else {
+        }
+        else {
             std::cout << "Controller " << 0 << " is not connected!\n\n";
         }
     }
@@ -199,7 +205,8 @@ public:
         float LT = state.Gamepad.bLeftTrigger;
         if (RT > 50 || LT > 50) {
             PSZ.setCurrent(zCurrent * -1, voltageLimit);
-        } else if (RT < 50) {
+        }
+        else if (RT < 50) {
             PSZ.setCurrent(zCurrent, voltageLimit);
         }
     }
@@ -236,18 +243,18 @@ public:
             lastKeyPressed = state.Gamepad.wButtons;
             int start = 0;
             switch (lastKeyPressed) {
-                case 8: // right
-                    start = 0;
-                    break;
-                case 1: // up
-                    start = NUM_STEPS / 4;
-                    break;
-                case 4: // left
-                    start = NUM_STEPS / 2;
-                    break;
-                case 2: // down
-                    start = NUM_STEPS * 3 / 4;
-                    break;
+            case 8: // right
+                start = 0;
+                break;
+            case 1: // up
+                start = NUM_STEPS / 4;
+                break;
+            case 4: // left
+                start = NUM_STEPS / 2;
+                break;
+            case 2: // down
+                start = NUM_STEPS * 3 / 4;
+                break;
             }
             PSX.setHoppingCurrentList(cosLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, start);
             PSY.setHoppingCurrentList(sinLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, start);
@@ -312,7 +319,7 @@ public:
 * VISA help under the Section titled Type Assignments Table. The VISA
 * help is located in your NI-VISA directory or folder.
 */
- 
+
 int main(void) {
     float voltageLimit = 20;
     float freq;
@@ -331,12 +338,12 @@ int main(void) {
     // XY-FIELD 
     float xyCurrent;
     std::cout << "xy-field Current: ";
-    std::cin >> xyCurrent;    
+    std::cin >> xyCurrent;
     std::cout << "\n";
 
-    MagnetSystem magnets = MagnetSystem("ASRL3::INSTR", "ASRL4::INSTR", "ASRL5::INSTR", 
-                                        zCurrent, xyCurrent, freq, voltageLimit);
+    MagnetSystem magnets = MagnetSystem("ASRL3::INSTR", "ASRL4::INSTR", "ASRL5::INSTR",
+        zCurrent, xyCurrent, freq, voltageLimit);
     magnets.initializeController();
     //magnets.testXY();
     magnets.run();
-}        
+}
