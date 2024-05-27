@@ -124,6 +124,8 @@ public:
     }
 
     // Send a list of current values to the power supply, creating a waveform that causes the hopping motion.
+    // The angle is first set to theta and stays there for T/2, then goes to theta + pi in T/2,
+    // then stays at theta + pi for T/2, then goes to theta + 2pi in T/2.
     // Parameters:
     //     LUT: Lookup table for sine OR cosine funtions
     //     count: number of times to repeat the waveform
