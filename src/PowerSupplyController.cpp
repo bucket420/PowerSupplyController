@@ -37,8 +37,12 @@
 #define M_PI 3.14159265358979323846
 #define NUM_STEPS 48
 
+/*
+    Class representing a power supply.
+*/
 class PowerSupply {
 public:
+    // VISA session variables
     ViSession defaultRM;
     ViSession instr;
     ViStatus status;
@@ -47,9 +51,13 @@ public:
     unsigned char buffer[100];
     char command[512];
 
+    // Default constructor
     PowerSupply() {
     }
 
+    // Constructor with descriptor, connecting the power supply to the computer. 
+    // The descriptor contains the name of the port the power supply is connected to. 
+    // E.g. "ASRL3::INSTR".
     PowerSupply(const char* descriptor) {
         status = viOpenDefaultRM(&this->defaultRM);
         if (status < VI_SUCCESS) {
@@ -64,6 +72,7 @@ public:
         status = viSetAttribute(instr, VI_ATTR_TMO_VALUE, 5000);
     }
 
+    // Send the string stored in `command` to the power supply to execute.
     void executeCommand() {
         status = viWrite(instr, (ViBuf)this->command, (ViUInt32)strlen(this->command), &this->writeCount);
         if (status < VI_SUCCESS) {
@@ -72,21 +81,30 @@ public:
         memset(command, 0, 512 * sizeof(char));
     }
 
+    // Reset the power supply.
     void reset() {
         std::cout << "Resetting the device\n\n";
         strcpy(command, "*rst\n");
         executeCommand();
     }
 
+    // Set the current value and voltage limit of the power supply.
     void setCurrent(float current, float voltageLimit) {
         sprintf(command, "func:mode curr;:curr %f;:volt %f;:outp on\n", current, voltageLimit);
         executeCommand();
     }
 
+    // Send a list of current values to the power supply.
+    // Parameters:
+    //     currentList: array of current values to send to the power supply
+    //     length: number of entries in the array
+    //     dwell: time in seconds to wait between each current value
+    //     count: number of times to repeat the waveform
     void setCurrentList(float* currentList, int length, float voltageLimit, float dwell, int count) {
         sprintf(command, "list:cle;:list:dwel %f;:func:mode curr;:volt %f\n", dwell, voltageLimit);
         std::cout << command;
         executeCommand();
+        // The list has to be broken up into smaller parts because the length of the command is limited.
         for (int i = 0; i < length; i++) {
             if (i % 8 == 0) {
                 strcpy(command, "list:curr ");
@@ -105,6 +123,11 @@ public:
         std::cout << command;
     }
 
+    // Send a list of current values to the power supply, creating a waveform that causes the hopping motion.
+    // Parameters:
+    //     LUT: Lookup table for sine OR cosine funtions
+    //     count: number of times to repeat the waveform
+    //     start: starting index of the LUT, corresponding to the starting angle and the direction of the hopping motion
     void setHoppingCurrentList(float* LUT, float voltageLimit, float dwell, int count, int start) {
         sprintf(command, "list:cle;:list:dwel %f;:func:mode curr;:volt %f\n", dwell, voltageLimit);
         std::cout << command;
@@ -139,6 +162,11 @@ public:
     }
 };
 
+/*
+    Class representing the entire magnet system. 
+    The magnet system consists of three power supplies, one for each axis. 
+    The system can be controlled using an Xbox controller. 
+*/
 class MagnetSystem {
 public:
     PowerSupply PSX;
@@ -156,6 +184,7 @@ public:
     int lastKeyPressed = 0;
     bool active = true;
 
+    // Constructor for the MagnetSystem class.
     MagnetSystem(const char* descriptorX, const char* descriptorY, const char* descriptorZ,
         float zCurrent, float xyCurrent, float freq, float voltageLimit) {
         PSX = PowerSupply(descriptorX);
@@ -173,6 +202,7 @@ public:
         zHoppingLUT[1] = -zCurrent;
     }
 
+    // Fill the cosine and sine lookup tables with values.
     void fillTrigLUTs(float curr) {
         for (int i = 0; i < NUM_STEPS; i++) {
             this->cosLUT[i] = cos((i * 2 * M_PI) / NUM_STEPS) * curr;
@@ -180,6 +210,7 @@ public:
         }
     }
 
+    // Initialize the controller.
     void initializeController() {
         ZeroMemory(&state, sizeof(XINPUT_STATE));
         dwResult = XInputGetState(0, &state);
@@ -191,6 +222,8 @@ public:
         }
     }
 
+    // Control the power supplies using the joystick.
+    // The position of the joystick determines angle of the particles.
     void joystickControl() {
         float LX = state.Gamepad.sThumbLX;
         // std::cout << "Left Joystick X-Value " << LX << "\n";
@@ -200,6 +233,8 @@ public:
         PSY.setCurrent((LY / 32768) * xyCurrent, voltageLimit);
     }
 
+    // Control the power supplies using the triggers.
+    // The z field is flipped when the triggers are pressed or released.
     void triggerControl() {
         float RT = state.Gamepad.bRightTrigger;
         float LT = state.Gamepad.bLeftTrigger;
@@ -211,6 +246,8 @@ public:
         }
     }
 
+    // Control the power supplies using the X button. 
+    // Rotate the particles in a circle.
     void xButtonControl() {
         if (state.Gamepad.wButtons == 16384) {
             lastKeyPressed = state.Gamepad.wButtons;
@@ -229,6 +266,8 @@ public:
         }
     }
 
+    // Control the power supplies using the start button.
+    // Stop all commands and reset the power supplies.
     void startButtonControl() {
         if (state.Gamepad.wButtons == 16) {
             PSX.reset();
@@ -238,6 +277,8 @@ public:
         }
     }
 
+    // Control the power supplies using the direction pad.
+    // Move the particles in the direction of the pressed button.
     void dirPadControl() {
         if (state.Gamepad.wButtons > 0 && state.Gamepad.wButtons < 9) {
             lastKeyPressed = state.Gamepad.wButtons;
@@ -289,6 +330,7 @@ public:
         }
     }
 
+    // Test the XY field.
     void testXY() {
         PSX.setHoppingCurrentList(cosLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, 0);
         PSX.executeCommand();
@@ -296,6 +338,7 @@ public:
         PSY.executeCommand();*/
     }
 
+    // Run the controller.
     void run() {
         while (active) {
             dwResult = XInputGetState(0, &state);
