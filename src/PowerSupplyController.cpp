@@ -1,20 +1,3 @@
-/********************************************************************/
-/* Kepco Sample Program using National Instruments VISA	            */
-/* note : visa32.lib must be included in your project               */
-/********************************************************************/
-/*              Read and Write to an Instrument Example             */
-/*                                                                  */
-/* This code demonstrates synchronous read and write executeCommands to a  */
-/* GPIB, serial or message-based VXI instrument using VISA.         */
-/*                                                                  */
-/* The general flow of the code is                                  */
-/*      Open Resource Manager                                       */
-/*      Open VISA Session to an Instrument                          */
-/*      Write the Identification Query Using viWrite                */
-/*      Try to Read a Response With viRead                          */
-/*      Close the VISA Session                                      */
-/********************************************************************/
-
 #if defined(_MSC_VER) && !defined(_CRT_SECURE_NO_DEPRECATE)
 #define _CRT_SECURE_NO_DEPRECATE
 #endif
@@ -31,11 +14,14 @@
 #include "Xinput.h"
 #include <cmath>
 #include <math.h>
+#include <thread>
 
 #pragma comment(lib,"XInput.lib")
 #pragma comment(lib,"Xinput9_1_0.lib")
 #define M_PI 3.14159265358979323846
 #define NUM_STEPS 48
+
+
 
 /*
     Class representing a power supply.
@@ -333,11 +319,19 @@ public:
     }
 
     // Test the XY field.
-    void testXY() {
+    void testHopping() {
         PSX.setHoppingCurrentList(cosLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, 0);
-        PSX.executeCommand();
-        /*PSY.setHoppingCurrentList(sinLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, 0);
-        PSY.executeCommand();*/
+        PSZ.setCurrentList(zHoppingLUT, 2, voltageLimit, 1 / freq, 0);
+        PSY.setHoppingCurrentList(sinLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, 0);
+        // PSX.executeCommand();        
+        // PSY.executeCommand();
+        // PSZ.executeCommand();
+        std::thread t1(&PowerSupply::executeCommand, &PSX);
+        std::thread t2(&PowerSupply::executeCommand, &PSY);
+        std::thread t3(&PowerSupply::executeCommand, &PSZ);
+        t1.join();
+        t2.join();
+        t3.join();
     }
 
     // Run the controller.
@@ -388,7 +382,7 @@ int main(void) {
 
     MagnetSystem magnets = MagnetSystem("ASRL3::INSTR", "ASRL4::INSTR", "ASRL5::INSTR",
         zCurrent, xyCurrent, freq, voltageLimit);
-    magnets.initializeController();
-    //magnets.testXY();
-    magnets.run();
+    //magnets.initializeController();
+    magnets.testHopping();
+    // magnets.run();
 }
