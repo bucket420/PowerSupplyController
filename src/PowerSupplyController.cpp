@@ -36,6 +36,7 @@ public:
     ViUInt32 writeCount;
     unsigned char buffer[100];
     char command[512];
+    char name[32];
 
     // Default constructor
     PowerSupply() {
@@ -45,6 +46,7 @@ public:
     // The descriptor contains the name of the port the power supply is connected to. 
     // E.g. "ASRL3::INSTR".
     PowerSupply(const char* descriptor) {
+        sprintf(name, descriptor);
         status = viOpenDefaultRM(&this->defaultRM);
         if (status < VI_SUCCESS) {
             printf("Could not open a session to the VISA Resource Manager!\n\n");
@@ -58,9 +60,21 @@ public:
         status = viSetAttribute(instr, VI_ATTR_TMO_VALUE, 5000);
     }
 
-    // Send the string stored in `command` to the power supply to execute.
     void executeCommand() {
         status = viWrite(instr, (ViBuf)this->command, (ViUInt32)strlen(this->command), &this->writeCount);
+        if (status < VI_SUCCESS) {
+            std::cout << "Error writing to the device\n\n";
+        }
+        memset(command, 0, 512 * sizeof(char));
+    }
+
+    // Send the string stored in `command` to the power supply to execute.
+    void executeCommandDebug() {
+        auto begin = std::chrono::high_resolution_clock::now();
+        status = viWrite(instr, (ViBuf)this->command, (ViUInt32)strlen(this->command), &this->writeCount);
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed_seconds = end - begin;
+        std::cout << "Write time for " << name << ": " << elapsed_seconds.count() << "s" << std::endl;
         if (status < VI_SUCCESS) {
             std::cout << "Error writing to the device\n\n";
         }
@@ -326,9 +340,24 @@ public:
         // PSX.executeCommand();        
         // PSY.executeCommand();
         // PSZ.executeCommand();
-        std::thread t1(&PowerSupply::executeCommand, &PSX);
-        std::thread t2(&PowerSupply::executeCommand, &PSY);
-        std::thread t3(&PowerSupply::executeCommand, &PSZ);
+        //auto begin = std::chrono::high_resolution_clock::now();
+        std::thread t1(&PowerSupply::executeCommandDebug, &PSX);
+        //auto end = std::chrono::high_resolution_clock::now();
+        //std::chrono::duration<double> elapsed_seconds = end - begin;
+        //std::cout << "thread creation time (x): " << elapsed_seconds.count() << "s" << std::endl;
+
+        //begin = std::chrono::high_resolution_clock::now();
+        std::thread t2(&PowerSupply::executeCommandDebug, &PSY);
+        //end = std::chrono::high_resolution_clock::now();
+        //elapsed_seconds = end - begin;
+        //std::cout << "thread creation time (y): " << elapsed_seconds.count() << "s" << std::endl;
+
+        //begin = std::chrono::high_resolution_clock::now();
+        std::thread t3(&PowerSupply::executeCommandDebug, &PSZ);
+        //end = std::chrono::high_resolution_clock::now();
+        //elapsed_seconds = end - begin;
+        //std::cout << "thread creation time (z): " << elapsed_seconds.count() << "s" << std::endl;
+
         t1.join();
         t2.join();
         t3.join();
