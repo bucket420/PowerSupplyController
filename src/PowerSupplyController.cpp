@@ -332,6 +332,13 @@ public:
         }
     }
 
+    void executeCommandWrapper(PowerSupply* ps, bool sleep) {
+        if (sleep) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(57));
+        }
+        ps->executeCommand();
+    }
+
     // Test the XY field.
     void testHopping() {
         PSX.setHoppingCurrentList(cosLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, 0);
@@ -341,19 +348,19 @@ public:
         // PSY.executeCommand();
         // PSZ.executeCommand();
         //auto begin = std::chrono::high_resolution_clock::now();
-        std::thread t1(&PowerSupply::executeCommandDebug, &PSX);
+        std::thread t1(executeCommandWrapper, &PSX, true);
         //auto end = std::chrono::high_resolution_clock::now();
         //std::chrono::duration<double> elapsed_seconds = end - begin;
         //std::cout << "thread creation time (x): " << elapsed_seconds.count() << "s" << std::endl;
 
         //begin = std::chrono::high_resolution_clock::now();
-        std::thread t2(&PowerSupply::executeCommandDebug, &PSY);
+        std::thread t2(executeCommandWrapper, &PSY, false);
         //end = std::chrono::high_resolution_clock::now();
         //elapsed_seconds = end - begin;
         //std::cout << "thread creation time (y): " << elapsed_seconds.count() << "s" << std::endl;
 
         //begin = std::chrono::high_resolution_clock::now();
-        std::thread t3(&PowerSupply::executeCommandDebug, &PSZ);
+        std::thread t3(executeCommandWrapper, &PSZ, false);
         //end = std::chrono::high_resolution_clock::now();
         //elapsed_seconds = end - begin;
         //std::cout << "thread creation time (z): " << elapsed_seconds.count() << "s" << std::endl;
