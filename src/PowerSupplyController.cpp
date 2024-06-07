@@ -60,21 +60,9 @@ public:
         status = viSetAttribute(instr, VI_ATTR_TMO_VALUE, 5000);
     }
 
+    // Send the string stored in `command` to the power supply to execute.
     void executeCommand() {
         status = viWrite(instr, (ViBuf)this->command, (ViUInt32)strlen(this->command), &this->writeCount);
-        if (status < VI_SUCCESS) {
-            std::cout << "Error writing to the device\n\n";
-        }
-        memset(command, 0, 512 * sizeof(char));
-    }
-
-    // Send the string stored in `command` to the power supply to execute.
-    void executeCommandDebug() {
-        auto begin = std::chrono::high_resolution_clock::now();
-        status = viWrite(instr, (ViBuf)this->command, (ViUInt32)strlen(this->command), &this->writeCount);
-        auto end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> elapsed_seconds = end - begin;
-        std::cout << "Write time for " << name << ": " << elapsed_seconds.count() << "s" << std::endl;
         if (status < VI_SUCCESS) {
             std::cout << "Error writing to the device\n\n";
         }
@@ -279,6 +267,16 @@ public:
         }
     }
 
+    // Wrapper for multithreaded execution
+    // For some reaseon, ASRL4::INSTR is slower than the other two by ~57ms
+    // sleep_for is used to correct that
+    void executeCommandWrapper(PowerSupply* ps, bool sleep) {
+        if (sleep) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(57));
+        }
+        ps->executeCommand();
+    }
+
     // Control the power supplies using the direction pad.
     // Move the particles in the direction of the pressed button.
     void dirPadControl() {
@@ -299,27 +297,20 @@ public:
                 start = NUM_STEPS * 3 / 4;
                 break;
             }
-            PSX.setHoppingCurrentList(cosLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, start);
-            PSY.setHoppingCurrentList(sinLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, start);
+            // Send all the lists to the power supplies
+            PSX.setHoppingCurrentList(cosLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, 0);
+            PSY.setHoppingCurrentList(sinLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, 0);
             PSZ.setCurrentList(zHoppingLUT, 2, voltageLimit, 1 / freq, 0);
 
-            //auto begin = std::chrono::high_resolution_clock::now();
-            PSY.executeCommand();
-            //auto end = std::chrono::high_resolution_clock::now();
-            //std::chrono::duration<double> elapsed_seconds = end - begin;
-            //std::cout << "Elapsed time (y): " << elapsed_seconds.count() << "s" << std::endl;
+            // Execute the commands concurrently
+            std::thread t1(&MagnetSystem::executeCommandWrapper, this, &PSX, true);
+            std::thread t2(&MagnetSystem::executeCommandWrapper, this, &PSY, false);
+            std::thread t3(&MagnetSystem::executeCommandWrapper, this, &PSZ, true);
 
-            //begin = std::chrono::high_resolution_clock::now();
-            PSX.executeCommand();
-            //end = std::chrono::high_resolution_clock::now();
-            //elapsed_seconds = end - begin;
-            //std::cout << "Elapsed time (x): " << elapsed_seconds.count() << "s" << std::endl;
-
-            //begin = std::chrono::high_resolution_clock::now();
-            PSZ.executeCommand();
-            //end = std::chrono::high_resolution_clock::now();
-            //elapsed_seconds = end - begin;
-            //std::cout << "Elapsed time (z): " << elapsed_seconds.count() << "s" << std::endl;
+            // Remove threads after finishing
+            t1.join();
+            t2.join();
+            t3.join();
         }
         while (state.Gamepad.wButtons == lastKeyPressed && state.Gamepad.wButtons != 0) {
             dwResult = XInputGetState(0, &state);
@@ -332,39 +323,16 @@ public:
         }
     }
 
-    void executeCommandWrapper(PowerSupply* ps, bool sleep) {
-        if (sleep) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(57));
-        }
-        ps->executeCommand();
-    }
 
-    // Test the XY field.
+
+    // Test the hopping function
     void testHopping() {
         PSX.setHoppingCurrentList(cosLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, 0);
         PSY.setHoppingCurrentList(sinLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, 0);
         PSZ.setCurrentList(zHoppingLUT, 2, voltageLimit, 1 / freq, 0);
-        // PSX.executeCommand();        
-        // PSY.executeCommand();
-        // PSZ.executeCommand();
-        //auto begin = std::chrono::high_resolution_clock::now();
         std::thread t1(&MagnetSystem::executeCommandWrapper, this, &PSX, true);
-        //auto end = std::chrono::high_resolution_clock::now();
-        //std::chrono::duration<double> elapsed_seconds = end - begin;
-        //std::cout << "thread creation time (x): " << elapsed_seconds.count() << "s" << std::endl;
-
-        //begin = std::chrono::high_resolution_clock::now();
         std::thread t2(&MagnetSystem::executeCommandWrapper, this, &PSY, false);
-        //end = std::chrono::high_resolution_clock::now();
-        //elapsed_seconds = end - begin;
-        //std::cout << "thread creation time (y): " << elapsed_seconds.count() << "s" << std::endl;
-
-        //begin = std::chrono::high_resolution_clock::now();
-        std::thread t3(&MagnetSystem::executeCommandWrapper, this, &PSZ, false);
-        //end = std::chrono::high_resolution_clock::now();
-        //elapsed_seconds = end - begin;
-        //std::cout << "thread creation time (z): " << elapsed_seconds.count() << "s" << std::endl;
-
+        std::thread t3(&MagnetSystem::executeCommandWrapper, this, &PSZ, true);
         t1.join();
         t2.join();
         t3.join();
@@ -419,6 +387,6 @@ int main(void) {
     MagnetSystem magnets = MagnetSystem("ASRL3::INSTR", "ASRL4::INSTR", "ASRL5::INSTR",
         zCurrent, xyCurrent, freq, voltageLimit);
     //magnets.initializeController();
-    magnets.testHopping();
     // magnets.run();
+    magnets.testHopping();
 }
