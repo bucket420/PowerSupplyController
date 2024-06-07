@@ -36,7 +36,6 @@ public:
     ViUInt32 writeCount;
     unsigned char buffer[100];
     char command[512];
-    char name[32];
 
     // Default constructor
     PowerSupply() {
@@ -46,7 +45,6 @@ public:
     // The descriptor contains the name of the port the power supply is connected to. 
     // E.g. "ASRL3::INSTR".
     PowerSupply(const char* descriptor) {
-        sprintf(name, descriptor);
         status = viOpenDefaultRM(&this->defaultRM);
         if (status < VI_SUCCESS) {
             printf("Could not open a session to the VISA Resource Manager!\n\n");
@@ -87,7 +85,7 @@ public:
     //     currentList: array of current values to send to the power supply
     //     length: number of entries in the array
     //     dwell: time in seconds to wait between each current value
-    //     count: number of times to repeat the waveform
+    //     count: number of times to repeat the list; if 0, continue forever
     void setCurrentList(float* currentList, int length, float voltageLimit, float dwell, int count) {
         sprintf(command, "list:cle;:list:dwel %f;:func:mode curr;:volt %f\n", dwell, voltageLimit);
         std::cout << command;
@@ -116,7 +114,7 @@ public:
     // then stays at theta + pi for T/2, then goes to theta + 2pi in T/2.
     // Parameters:
     //     LUT: Lookup table for sine OR cosine funtions
-    //     count: number of times to repeat the waveform
+    //     count: number of times to repeat the waveform; if 0, continue forever
     //     start: starting index of the LUT, corresponding to the starting angle and the direction of the hopping motion
     void setHoppingCurrentList(float* LUT, float voltageLimit, float dwell, int count, int start) {
         sprintf(command, "list:cle;:list:dwel %f;:func:mode curr;:volt %f\n", dwell, voltageLimit);
@@ -159,19 +157,36 @@ public:
 */
 class MagnetSystem {
 public:
+    // 3 power supplies
     PowerSupply PSX;
     PowerSupply PSY;
     PowerSupply PSZ;
+
+    // Controller variables
     DWORD dwResult;
     XINPUT_STATE state;
+
+    // Max voltage
     float voltageLimit;
+
+    // Currents
     float zCurrent;
     float xyCurrent;
+
+    // Frequency of hopping motion
     float freq;
+
+    // Lookup tables for x and y currents
     float cosLUT[NUM_STEPS];
     float sinLUT[NUM_STEPS];
+
+    // Lookup table for z current, only 2 elements [zCurrent, -zCurrent]
     float zHoppingLUT[2];
+
+    // Last key pressed
     int lastKeyPressed = 0;
+
+    // Is the system running?
     bool active = true;
 
     // Constructor for the MagnetSystem class.
@@ -212,6 +227,16 @@ public:
         }
     }
 
+    // Wrapper for multithreaded execution
+    // For some reason, ASRL4::INSTR is slower than the other two by ~57ms
+    // sleep_for is used to correct that
+    void executeCommandWrapper(PowerSupply* ps, bool sleep) {
+        if (sleep) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(57));
+        }
+        ps->executeCommand();
+    }
+
     // Control the power supplies using the joystick.
     // The position of the joystick determines angle of the particles.
     void joystickControl() {
@@ -241,14 +266,24 @@ public:
     void xButtonControl() {
         if (state.Gamepad.wButtons == 16384) {
             lastKeyPressed = state.Gamepad.wButtons;
+
+            // Send all the lists to the power supplies
             PSX.setCurrentList(cosLUT, NUM_STEPS, voltageLimit, 1 / freq / NUM_STEPS, 0);
             PSY.setCurrentList(sinLUT, NUM_STEPS, voltageLimit, 1 / freq / NUM_STEPS, 0);
-            PSX.executeCommand();
-            PSY.executeCommand();
+
+            // Execute the commands concurrently
+            std::thread t1(&MagnetSystem::executeCommandWrapper, this, &PSX, true);
+            std::thread t2(&MagnetSystem::executeCommandWrapper, this, &PSY, false);
+
+            // Remove threads after finishing
+            t1.join();
+            t2.join();
         }
+        // Keep it running when the button is pressed
         while (state.Gamepad.wButtons == lastKeyPressed && state.Gamepad.wButtons != 0) {
             dwResult = XInputGetState(0, &state);
         }
+        // Reset the power supplies when the button is released
         if (state.Gamepad.wButtons == 0 && lastKeyPressed == 16384) {
             PSX.reset();
             PSY.reset();
@@ -265,16 +300,6 @@ public:
             PSZ.reset();
             active = false;
         }
-    }
-
-    // Wrapper for multithreaded execution
-    // For some reaseon, ASRL4::INSTR is slower than the other two by ~57ms
-    // sleep_for is used to correct that
-    void executeCommandWrapper(PowerSupply* ps, bool sleep) {
-        if (sleep) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(57));
-        }
-        ps->executeCommand();
     }
 
     // Control the power supplies using the direction pad.
@@ -312,9 +337,11 @@ public:
             t2.join();
             t3.join();
         }
+        // Keep it running when the button is pressed
         while (state.Gamepad.wButtons == lastKeyPressed && state.Gamepad.wButtons != 0) {
             dwResult = XInputGetState(0, &state);
         }
+        // Reset the power supplies when the button is released
         if (state.Gamepad.wButtons == 0 && lastKeyPressed > 0 && lastKeyPressed < 9) {
             PSX.reset();
             PSY.reset();
@@ -322,8 +349,6 @@ public:
             lastKeyPressed = 0;
         }
     }
-
-
 
     // Test the hopping function
     void testHopping() {
@@ -374,13 +399,13 @@ int main(void) {
 
     // Z-FIELD 
     float zCurrent;
-    std::cout << "z-field Current: ";
+    std::cout << "z-field current: ";
     std::cin >> zCurrent;
     std::cout << "\n";
 
     // XY-FIELD 
     float xyCurrent;
-    std::cout << "xy-field Current: ";
+    std::cout << "xy-field current: ";
     std::cin >> xyCurrent;
     std::cout << "\n";
 
