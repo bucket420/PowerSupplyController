@@ -1,20 +1,3 @@
-/********************************************************************/
-/* Kepco Sample Program using National Instruments VISA	            */
-/* note : visa32.lib must be included in your project               */
-/********************************************************************/
-/*              Read and Write to an Instrument Example             */
-/*                                                                  */
-/* This code demonstrates synchronous read and write executeCommands to a  */
-/* GPIB, serial or message-based VXI instrument using VISA.         */
-/*                                                                  */
-/* The general flow of the code is                                  */
-/*      Open Resource Manager                                       */
-/*      Open VISA Session to an Instrument                          */
-/*      Write the Identification Query Using viWrite                */
-/*      Try to Read a Response With viRead                          */
-/*      Close the VISA Session                                      */
-/********************************************************************/
-
 #if defined(_MSC_VER) && !defined(_CRT_SECURE_NO_DEPRECATE)
 #define _CRT_SECURE_NO_DEPRECATE
 #endif
@@ -31,11 +14,14 @@
 #include "Xinput.h"
 #include <cmath>
 #include <math.h>
+#include <thread>
 
 #pragma comment(lib,"XInput.lib")
 #pragma comment(lib,"Xinput9_1_0.lib")
 #define M_PI 3.14159265358979323846
 #define NUM_STEPS 48
+
+
 
 /*
     Class representing a power supply.
@@ -50,6 +36,7 @@ public:
     ViUInt32 writeCount;
     unsigned char buffer[100];
     char command[512];
+    char name[32];
 
     // Default constructor
     PowerSupply() {
@@ -59,6 +46,7 @@ public:
     // The descriptor contains the name of the port the power supply is connected to. 
     // E.g. "ASRL3::INSTR".
     PowerSupply(const char* descriptor) {
+        sprintf(name, descriptor);
         status = viOpenDefaultRM(&this->defaultRM);
         if (status < VI_SUCCESS) {
             printf("Could not open a session to the VISA Resource Manager!\n\n");
@@ -279,6 +267,16 @@ public:
         }
     }
 
+    // Wrapper for multithreaded execution
+    // For some reaseon, ASRL4::INSTR is slower than the other two by ~57ms
+    // sleep_for is used to correct that
+    void executeCommandWrapper(PowerSupply* ps, bool sleep) {
+        if (sleep) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(57));
+        }
+        ps->executeCommand();
+    }
+
     // Control the power supplies using the direction pad.
     // Move the particles in the direction of the pressed button.
     void dirPadControl() {
@@ -299,27 +297,20 @@ public:
                 start = NUM_STEPS * 3 / 4;
                 break;
             }
-            PSX.setHoppingCurrentList(cosLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, start);
-            PSY.setHoppingCurrentList(sinLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, start);
+            // Send all the lists to the power supplies
+            PSX.setHoppingCurrentList(cosLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, 0);
+            PSY.setHoppingCurrentList(sinLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, 0);
             PSZ.setCurrentList(zHoppingLUT, 2, voltageLimit, 1 / freq, 0);
 
-            //auto begin = std::chrono::high_resolution_clock::now();
-            PSY.executeCommand();
-            //auto end = std::chrono::high_resolution_clock::now();
-            //std::chrono::duration<double> elapsed_seconds = end - begin;
-            //std::cout << "Elapsed time (y): " << elapsed_seconds.count() << "s" << std::endl;
+            // Execute the commands concurrently
+            std::thread t1(&MagnetSystem::executeCommandWrapper, this, &PSX, true);
+            std::thread t2(&MagnetSystem::executeCommandWrapper, this, &PSY, false);
+            std::thread t3(&MagnetSystem::executeCommandWrapper, this, &PSZ, true);
 
-            //begin = std::chrono::high_resolution_clock::now();
-            PSX.executeCommand();
-            //end = std::chrono::high_resolution_clock::now();
-            //elapsed_seconds = end - begin;
-            //std::cout << "Elapsed time (x): " << elapsed_seconds.count() << "s" << std::endl;
-
-            //begin = std::chrono::high_resolution_clock::now();
-            PSZ.executeCommand();
-            //end = std::chrono::high_resolution_clock::now();
-            //elapsed_seconds = end - begin;
-            //std::cout << "Elapsed time (z): " << elapsed_seconds.count() << "s" << std::endl;
+            // Remove threads after finishing
+            t1.join();
+            t2.join();
+            t3.join();
         }
         while (state.Gamepad.wButtons == lastKeyPressed && state.Gamepad.wButtons != 0) {
             dwResult = XInputGetState(0, &state);
@@ -332,12 +323,19 @@ public:
         }
     }
 
-    // Test the XY field.
-    void testXY() {
+
+
+    // Test the hopping function
+    void testHopping() {
         PSX.setHoppingCurrentList(cosLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, 0);
-        PSX.executeCommand();
-        /*PSY.setHoppingCurrentList(sinLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, 0);
-        PSY.executeCommand();*/
+        PSY.setHoppingCurrentList(sinLUT, voltageLimit, 1 / freq / NUM_STEPS, 0, 0);
+        PSZ.setCurrentList(zHoppingLUT, 2, voltageLimit, 1 / freq, 0);
+        std::thread t1(&MagnetSystem::executeCommandWrapper, this, &PSX, true);
+        std::thread t2(&MagnetSystem::executeCommandWrapper, this, &PSY, false);
+        std::thread t3(&MagnetSystem::executeCommandWrapper, this, &PSZ, true);
+        t1.join();
+        t2.join();
+        t3.join();
     }
 
     // Run the controller.
@@ -388,7 +386,7 @@ int main(void) {
 
     MagnetSystem magnets = MagnetSystem("ASRL3::INSTR", "ASRL4::INSTR", "ASRL5::INSTR",
         zCurrent, xyCurrent, freq, voltageLimit);
-    magnets.initializeController();
-    //magnets.testXY();
-    magnets.run();
+    //magnets.initializeController();
+    // magnets.run();
+    magnets.testHopping();
 }
